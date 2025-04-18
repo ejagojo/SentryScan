@@ -4,18 +4,11 @@ Enterprise‑grade Go CLI that will scan Git history and container images for se
 
 ## Requirements
 * Go 1.22 or newer
-* `make` (for local convenience targets)
-* `golangci-lint` (optional but recommended)
+* `make` (local convenience targets)
 
-## Quick start
+### Lint tool
+Install **golangci‑lint** so local runs match CI:
 
 ```bash
-# clone & enter repo
-git clone git@github.com:your-username/sentryscan.git
-cd sentryscan
-
-# build binary
-make build
-
-# run CLI
-make run
+go install github.com/golangci-lint/golangci-lint/cmd/golangci-lint@v1.57.2
+# ensure GOPATH/bin is on PATH
