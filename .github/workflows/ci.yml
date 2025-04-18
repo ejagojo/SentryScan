@@ -21,6 +21,7 @@ jobs:
         uses: golangci/golangci-lint-action@v4
         with:
           version: v1.59.0
+          skip-cache: true
 
       - name: Format
         run: make fmt
