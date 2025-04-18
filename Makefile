@@ -1,10 +1,12 @@
 .PHONY: build run fmt lint vet test
 
 build:
+	mkdir -p bin
 	go build -o bin/sentryscan ./cmd/sentryscan
 
 run:
-	go run ./cmd/sentryscan
+	make build
+	./bin/sentryscan
 
 fmt:
 	go fmt ./...
