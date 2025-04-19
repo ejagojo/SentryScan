@@ -371,12 +371,23 @@ func TestWebhookPayloadValidation(t *testing.T) {
 
 func TestWebhookTimeout(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Read and discard the request body
+		io.ReadAll(r.Body)
+		r.Body.Close()
 		time.Sleep(2 * time.Second)
 		w.WriteHeader(http.StatusOK)
 	}))
 	defer ts.Close()
 
-	wh := NewWebhook(ts.URL, "test-secret")
+	wh := &Webhook{
+		url:    ts.URL,
+		secret: []byte("test-secret"),
+		client: &http.Client{
+			Timeout: 1 * time.Second,
+		},
+		nonces: make(map[string]time.Time),
+	}
+
 	payload := &Payload{
 		RunID:       "test-run",
 		Summary:     "test summary",
@@ -388,7 +399,7 @@ func TestWebhookTimeout(t *testing.T) {
 
 	err := wh.Send(payload)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "timeout")
+	assert.Contains(t, err.Error(), "context deadline exceeded")
 }
 
 func TestWebhookInvalidURL(t *testing.T) {

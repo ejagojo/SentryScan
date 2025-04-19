@@ -2,35 +2,130 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: [main]
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
 
 jobs:
-  build:
+  test:
+    name: Test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v3
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v4
         with:
-          go-version: '1.22'
-
-      - name: Install golangci-lint
-        uses: golangci/golangci-lint-action@v4
-        with:
-          version: v1.59.0
-          skip-cache: true
-
-      - name: Format
-        run: make fmt
-
-      - name: Vet
-        run: make vet
-
-      - name: Lint
-        run: make lint
+          go-version: "1.21"
+          cache: true
 
       - name: Build
         run: make build
+
+      - name: Test
+        run: make test
+
+      - name: Run linter
+        run: make lint
+
+      - name: Run security scanner
+        run: make security
+
+      - name: Run static analysis
+        run: make analysis
+
+      - name: Run fuzz tests
+        run: make fuzz
+
+      - name: Run race detector
+        run: make race
+
+      - name: Generate SBOM
+        run: |
+          curl -sSfL https://github.com/anchore/syft/releases/download/v1.5.0/syft_$(uname -s)_$(uname -m).tar.gz | tar xz
+          ./syft packages . -o cyclonedx-json > sbom.json
+          if grep -q "GPL-" sbom.json; then
+            echo "GPL license detected in dependencies"
+            exit 1
+          fi
+
+      - name: Upload SBOM
+        uses: actions/upload-artifact@v3
+        with:
+          name: sbom
+          path: sbom.json
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage
+          path: coverage.out
+
+  e2e:
+    needs: test
+    runs-on: ubuntu-latest
+    services:
+      docker:
+        image: docker:dind
+        options: >-
+          --privileged
+          --network=host
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
+
+      - name: Install dependencies
+        run: make deps
+
+      - name: Run e2e tests
+        run: make e2e
+        env:
+          GOFLAGS: -race
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
+
+      - name: Run linter
+        run: make lint
+
+  security:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.22"
+
+      - name: Run security scanner
+        run: make security
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18"
+
+      - name: Install markdown-link-check
+        run: npm install -g markdown-link-check
+
+      - name: Check links
+        run: |
+          find docs -name "*.md" -type f -exec markdown-link-check {} \;
